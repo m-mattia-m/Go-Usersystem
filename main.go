@@ -11,7 +11,7 @@ var users []User
 var accounts = make(gin.Accounts)
 
 func main() {
-	users = append(users, newUser("Admin", "Admin", "admin", "admin@mattiamueggler.ch", "Mattia12345!", "admin"))
+	users = append(users, newUser("Admin", "Admin", "admin", "admin@mattiamueggler.ch", "asdfasdf", "admin"))
 
 	// authorized := r.Group("/admin", gin.BasicAuth(accounts))
 	r := gin.Default()
@@ -27,16 +27,37 @@ func main() {
 func basicAuth(c *gin.Context) {
 	// Get the Basic Authentication credentials
 	user, password, hasAuth := c.Request.BasicAuth()
-	if hasAuth && user == "testuser" && password == "testpass" {
-		// log.WithFields(log.Fields{
-		// 	"user": user,
-		// }).Info("User authenticated")
-		fmt.Println("User authenticated")
+	fmt.Println(hasAuth)
+	fmt.Println("Input-user:" + user + ", input-password:" + password)
+
+	if hasAuth {
+		successLogin := false
+		fmt.Println(users)
+		for _, currentUser := range users {
+			fmt.Println("Loop-CurrentUsername: " + currentUser.Username + ", Loop-CurrentPassword: " + currentUser.Password)
+			if user == currentUser.Username && password == currentUser.Password {
+
+				// c.JSON(200, gin.H{"message": "You are authenticated"})
+				fmt.Println("User authenticated")
+				successLogin = true
+				break
+			} else {
+				successLogin = false
+			}
+		}
+
+		if !successLogin {
+			c.Abort()
+			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+			c.JSON(401, gin.H{"error": "unauthorized"})
+		}
+
 	} else {
 		c.Abort()
 		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
-		return
+		c.JSON(401, gin.H{"error": "has no login"})
 	}
+
 }
 
 func test(c *gin.Context) {
