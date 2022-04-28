@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var users []User
@@ -13,11 +14,7 @@ var accounts = make(gin.Accounts)
 func main() {
 	users = append(users, newUser("Admin", "Admin", "admin", "admin@mattiamueggler.ch", "asdfasdf", "admin"))
 
-	// authorized := r.Group("/admin", gin.BasicAuth(accounts))
 	r := gin.Default()
-	// authorized := initUsers(r)
-	// authorized := authorizeRequest(r)
-
 	r.POST("/registration", registration)
 	r.GET("/getUsers", basicAuth, getUsers)
 	r.GET("/test", test)
@@ -27,16 +24,11 @@ func main() {
 func basicAuth(c *gin.Context) {
 	// Get the Basic Authentication credentials
 	user, password, hasAuth := c.Request.BasicAuth()
-	fmt.Println(hasAuth)
-	fmt.Println("Input-user:" + user + ", input-password:" + password)
 
 	if hasAuth {
 		successLogin := false
-		fmt.Println(users)
 		for _, currentUser := range users {
-			fmt.Println("Loop-CurrentUsername: " + currentUser.Username + ", Loop-CurrentPassword: " + currentUser.Password)
-			if user == currentUser.Username && password == currentUser.Password {
-
+			if user == currentUser.Username && CheckPasswordHash(password, currentUser.Password) {
 				// c.JSON(200, gin.H{"message": "You are authenticated"})
 				fmt.Println("User authenticated")
 				successLogin = true
@@ -45,42 +37,20 @@ func basicAuth(c *gin.Context) {
 				successLogin = false
 			}
 		}
-
 		if !successLogin {
 			c.Abort()
 			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
 			c.JSON(401, gin.H{"error": "unauthorized"})
 		}
-
 	} else {
 		c.Abort()
 		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
 		c.JSON(401, gin.H{"error": "has no login"})
 	}
-
 }
 
 func test(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Hello World"})
-}
-
-// func authorizeRequest(r *gin.Engine) *gin.RouterGroup {
-// 	authorized := r.Group("/admin", gin.BasicAuth(accounts), func(c *gin.Context) {
-// 		fmt.Println(accounts)
-// 		// username := c.MustGet(gin.AuthUserKey).(string)
-// 		// fmt.Println(username)
-// 	})
-// 	return authorized
-// }
-
-func initUsers(r *gin.Engine) { // *gin.RouterGroup
-	// accounts = make(gin.Accounts)
-	for _, user := range users {
-		accounts[user.Username] = user.Password
-	}
-	fmt.Println(accounts)
-	gin.BasicAuth(accounts)
-	// return authorizeRequest(r)
 }
 
 func registration(c *gin.Context) {
@@ -88,7 +58,7 @@ func registration(c *gin.Context) {
 	lastname := c.PostForm("lastname")
 	username := c.PostForm("username")
 	email := c.PostForm("email")
-	password := c.PostForm("password")
+	password, _ := HashPassword(c.PostForm("password"))
 	role := c.PostForm("role")
 
 	currentUser := newUser(firstname, lastname, username, email, password, role)
@@ -96,11 +66,17 @@ func registration(c *gin.Context) {
 	c.JSON(200, currentUser)
 }
 
-func getUsers(c *gin.Context) {
-	// username := c.MustGet(gin.AuthUserKey).(string)
-	// password := c.MustGet(gin.AuthUserKey).(string)
-	// fmt.Println(username + ", " + password)
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
 
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func getUsers(c *gin.Context) {
 	if users != nil {
 		c.JSON(200, users)
 	} else {
