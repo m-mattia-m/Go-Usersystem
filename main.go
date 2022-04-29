@@ -15,23 +15,23 @@ func main() {
 
 	r := gin.Default()
 	r.POST("/registration", Registration)
-	r.GET("/getUsers", basicAuth, GetUsers)
-	r.GET("/deleteUser/:id", basicAuth, GetUser)
-	r.GET("/deleteUser", basicAuth, func(c *gin.Context) {
+	r.GET("/getUsers", BasicAuth, GetUsers)
+	r.GET("/deleteUser/:id", BasicAuth, GetUser)
+	r.GET("/deleteUser", BasicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /deleteUser/id")
 	})
-	r.GET("/getUser/:id", basicAuth, GetUser)
-	r.GET("/getUser", basicAuth, func(c *gin.Context) {
+	r.GET("/getUser/:id", BasicAuth, GetUser)
+	r.GET("/getUser", BasicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
 	})
-	r.POST("/editUser/:id", basicAuth, EditUser)
-	r.POST("/editUser", basicAuth, func(c *gin.Context) {
+	r.POST("/editUser/:id", BasicAuth, EditUser)
+	r.POST("/editUser", BasicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
 	})
 	r.Run(":3000")
 }
 
-func basicAuth(c *gin.Context) {
+func BasicAuth(c *gin.Context) {
 	// Get the Basic Authentication credentials
 	user, password, hasAuth := c.Request.BasicAuth()
 	fmt.Println(user, password, hasAuth)
