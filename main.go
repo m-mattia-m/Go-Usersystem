@@ -14,21 +14,20 @@ func main() {
 	// users = append(users, newUser("Admin", "Admin", "admin", "admin@mattiamueggler.ch", "asdfasdf", "admin"))
 
 	r := gin.Default()
-	r.POST("/registration", registration)
-	r.GET("/getUsers", basicAuth, getUsers)
-	r.GET("/deleteUser/:id", basicAuth, getUser)
+	r.POST("/registration", Registration)
+	r.GET("/getUsers", basicAuth, GetUsers)
+	r.GET("/deleteUser/:id", basicAuth, GetUser)
 	r.GET("/deleteUser", basicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /deleteUser/id")
 	})
-	r.GET("/getUser/:id", basicAuth, getUser)
+	r.GET("/getUser/:id", basicAuth, GetUser)
 	r.GET("/getUser", basicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
 	})
-	r.POST("/editUser/:id", basicAuth, editUser)
+	r.POST("/editUser/:id", basicAuth, EditUser)
 	r.POST("/editUser", basicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
 	})
-	r.GET("/test", test)
 	r.Run(":3000")
 }
 
@@ -41,7 +40,7 @@ func basicAuth(c *gin.Context) {
 		successLogin := false
 		for _, currentUser := range users {
 			fmt.Println(currentUser)
-			if user == currentUser.Username && CheckPasswordHash(password, currentUser.Password) {
+			if user == currentUser.Username && checkPasswordHash(password, currentUser.Password) {
 				// c.JSON(200, gin.H{"message": "You are authenticated"})
 				fmt.Println("User authenticated")
 				successLogin = true
@@ -62,33 +61,29 @@ func basicAuth(c *gin.Context) {
 	}
 }
 
-func test(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "Hello World"})
-}
-
-func registration(c *gin.Context) {
+func Registration(c *gin.Context) {
 	firstname := c.PostForm("firstname")
 	lastname := c.PostForm("lastname")
 	username := c.PostForm("username")
 	email := c.PostForm("email")
-	password, _ := HashPassword(c.PostForm("password"))
+	password, _ := hashPassword(c.PostForm("password"))
 	role := c.PostForm("role")
 	currentUser := newUser(firstname, lastname, username, email, password, role)
 	users = append(users, currentUser)
 	c.JSON(200, currentUser)
 }
 
-func HashPassword(password string) (string, error) {
+func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 4)
 	return string(bytes), err
 }
 
-func CheckPasswordHash(password, hash string) bool {
+func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
 
-func getUsers(c *gin.Context) {
+func GetUsers(c *gin.Context) {
 	if users != nil {
 		c.JSON(200, users)
 	} else {
@@ -109,7 +104,7 @@ func newUser(firstname string, lastname string, username string, email string, p
 	return *currentUser
 }
 
-func deleteUser(c *gin.Context) {
+func DeleteUser(c *gin.Context) {
 	id := c.Param("id")
 	checkUser := false
 
@@ -130,7 +125,7 @@ func deleteUser(c *gin.Context) {
 	}
 }
 
-func getUser(c *gin.Context) {
+func GetUser(c *gin.Context) {
 	id := c.Param("id")
 	checkUser := false
 
@@ -149,7 +144,7 @@ func getUser(c *gin.Context) {
 	}
 }
 
-func editUser(c *gin.Context) {
+func EditUser(c *gin.Context) {
 	id := c.Param("id")
 	checkUser := false
 	for i, user := range users {
@@ -158,7 +153,7 @@ func editUser(c *gin.Context) {
 			users[i].Lastname = c.PostForm("lastname")
 			users[i].Username = c.PostForm("username")
 			users[i].Email = c.PostForm("email")
-			users[i].Password, _ = HashPassword(c.PostForm("password"))
+			users[i].Password, _ = hashPassword(c.PostForm("password"))
 			users[i].Role = c.PostForm("role")
 			c.JSON(200, users[i])
 			checkUser = true
