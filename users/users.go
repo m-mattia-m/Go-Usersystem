@@ -2,6 +2,7 @@ package users
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -16,27 +17,22 @@ func BasicAuth(c *gin.Context) {
 	fmt.Println(user, password, hasAuth)
 	fmt.Println(users)
 	if hasAuth {
-		successLogin := false
-		for _, currentUser := range users {
-			fmt.Println(currentUser)
-			if user == currentUser.Username && checkPasswordHash(password, currentUser.Password) {
-				// c.JSON(200, gin.H{"message": "You are authenticated"})
-				fmt.Println("User authenticated")
-				successLogin = true
-				break
+		i := sort.Search(len(users), func(i int) bool { return user <= users[i].Username })
+		if i < len(users) && users[i].Username == user {
+			if checkPasswordHash(password, users[i].Password) {
+				// c.JSON(200, gin.H{"message": "user found"})
+				fmt.Println("successfully")
 			} else {
-				successLogin = false
+				// c.JSON(400, gin.H{"error": "password is not correct"})
+				c.Abort()
+				c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+				c.JSON(401, gin.H{"error": "unauthorized"})
 			}
-		}
-		if !successLogin {
+		} else {
 			c.Abort()
 			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
-			c.JSON(401, gin.H{"error": "unauthorized"})
+			c.JSON(400, gin.H{"error": "user not found"})
 		}
-	} else {
-		c.Abort()
-		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
-		c.JSON(401, gin.H{"error": "has no login"})
 	}
 }
 
@@ -85,19 +81,10 @@ func newUser(firstname string, lastname string, username string, email string, p
 
 func DeleteUser(c *gin.Context) {
 	id := c.Param("id")
-	checkUser := false
 
-	for i, user := range users {
-		if user.Id == id {
-			users = append(users[:i], users[i+1:]...)
-			checkUser = true
-			break
-		} else {
-			checkUser = false
-		}
-	}
-
-	if checkUser {
+	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
+	if i < len(users) && users[i].Id == id {
+		users = append(users[:i], users[i+1:]...)
 		c.JSON(200, gin.H{"message": "delete user with the id: " + id})
 	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
@@ -106,42 +93,28 @@ func DeleteUser(c *gin.Context) {
 
 func GetUser(c *gin.Context) {
 	id := c.Param("id")
-	checkUser := false
 
-	for _, user := range users {
-		if user.Id == id {
-			c.JSON(200, user)
-			checkUser = true
-			break
-		} else {
-			checkUser = false
-		}
-	}
-
-	if !checkUser {
+	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
+	if i < len(users) && users[i].Id == id {
+		c.JSON(200, users[i])
+	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
 	}
 }
 
 func EditUser(c *gin.Context) {
 	id := c.Param("id")
-	checkUser := false
-	for i, user := range users {
-		if user.Id == id {
-			users[i].Firstname = c.PostForm("firstname")
-			users[i].Lastname = c.PostForm("lastname")
-			users[i].Username = c.PostForm("username")
-			users[i].Email = c.PostForm("email")
-			users[i].Password, _ = hashPassword(c.PostForm("password"))
-			users[i].Role = c.PostForm("role")
-			c.JSON(200, users[i])
-			checkUser = true
-			break
-		} else {
-			checkUser = false
-		}
-	}
-	if !checkUser {
+
+	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
+	if i < len(users) && users[i].Id == id {
+		users[i].Firstname = c.PostForm("firstname")
+		users[i].Lastname = c.PostForm("lastname")
+		users[i].Username = c.PostForm("username")
+		users[i].Email = c.PostForm("email")
+		users[i].Password, _ = hashPassword(c.PostForm("password"))
+		users[i].Role = c.PostForm("role")
+		c.JSON(200, users[i])
+	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
 	}
 }
