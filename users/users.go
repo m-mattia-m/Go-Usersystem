@@ -43,9 +43,14 @@ func Registration(c *gin.Context) {
 	email := c.PostForm("email")
 	password, _ := hashPassword(c.PostForm("password"))
 	role := c.PostForm("role")
-	currentUser := newUser(firstname, lastname, username, email, password, role)
-	users = append(users, currentUser)
-	c.JSON(200, currentUser)
+	currentUser, msg := newUser(firstname, lastname, username, email, password, role)
+	if msg == "" {
+		users = append(users, currentUser)
+		c.JSON(200, currentUser)
+	} else {
+		c.JSON(400, gin.H{"error": msg})
+	}
+
 }
 
 func hashPassword(password string) (string, error) {
@@ -66,7 +71,19 @@ func GetUsers(c *gin.Context) {
 	}
 }
 
-func newUser(firstname string, lastname string, username string, email string, password string, role string) User {
+func newUser(firstname string, lastname string, username string, email string, password string, role string) (User, string) {
+
+	i := sort.Search(len(users), func(i int) bool { return username <= users[i].Username })
+	if i < len(users) && users[i].Username == username {
+		user := User{}
+		return user, "username already exists"
+	}
+	i = sort.Search(len(users), func(i int) bool { return email <= users[i].Email })
+	if i < len(users) && users[i].Email == email {
+		user := User{}
+		return user, "email already exists"
+	}
+
 	var currentUser = new(User)
 	currentUser.Id = uuid.New().String()
 	currentUser.Firstname = firstname
@@ -76,7 +93,7 @@ func newUser(firstname string, lastname string, username string, email string, p
 	currentUser.Password = password
 	currentUser.Role = role
 
-	return *currentUser
+	return *currentUser, ""
 }
 
 func DeleteUser(c *gin.Context) {
