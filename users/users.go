@@ -2,17 +2,21 @@ package users
 
 import (
 	"fmt"
+	"log"
 	"sort"
+
+	"usersystem/db"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var users []User
+// var users []User = getUsersFromDB()
 
 func BasicAuth(c *gin.Context) {
 	// Get the Basic Authentication credentials
+	var users []User = getUsersFromDB()
 	user, password, hasAuth := c.Request.BasicAuth()
 	fmt.Println(user, password, hasAuth)
 	fmt.Println(users)
@@ -45,7 +49,8 @@ func Registration(c *gin.Context) {
 	role := c.PostForm("role")
 	currentUser, msg := newUser(firstname, lastname, username, email, password, role)
 	if msg == "" {
-		users = append(users, currentUser)
+		// users = append(users, currentUser)
+		saveUserOnDB(currentUser)
 		c.JSON(200, currentUser)
 	} else {
 		c.JSON(400, gin.H{"error": msg})
@@ -64,6 +69,7 @@ func checkPasswordHash(password, hash string) bool {
 }
 
 func GetUsers(c *gin.Context) {
+	var users []User = getUsersFromDB()
 	if users != nil {
 		c.JSON(200, users)
 	} else {
@@ -72,7 +78,7 @@ func GetUsers(c *gin.Context) {
 }
 
 func newUser(firstname string, lastname string, username string, email string, password string, role string) (User, string) {
-
+	var users []User = getUsersFromDB()
 	i := sort.Search(len(users), func(i int) bool { return username <= users[i].Username })
 	if i < len(users) && users[i].Username == username {
 		user := User{}
@@ -98,10 +104,10 @@ func newUser(firstname string, lastname string, username string, email string, p
 
 func DeleteUser(c *gin.Context) {
 	id := c.Param("id")
+	var user User = getUserFromDBById(id)
 
-	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
-	if i < len(users) && users[i].Id == id {
-		users = append(users[:i], users[i+1:]...)
+	if user.Id == id {
+		deleteUserFromDB(user)
 		c.JSON(200, gin.H{"message": "delete user with the id: " + id})
 	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
@@ -110,10 +116,10 @@ func DeleteUser(c *gin.Context) {
 
 func GetUser(c *gin.Context) {
 	id := c.Param("id")
+	var user User = getUserFromDBById(id)
 
-	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
-	if i < len(users) && users[i].Id == id {
-		c.JSON(200, users[i])
+	if user.Id == id {
+		c.JSON(200, user)
 	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
 	}
@@ -121,19 +127,85 @@ func GetUser(c *gin.Context) {
 
 func EditUser(c *gin.Context) {
 	id := c.Param("id")
+	var user User = getUserFromDBById(id)
 
-	i := sort.Search(len(users), func(i int) bool { return id <= users[i].Id })
-	if i < len(users) && users[i].Id == id {
-		users[i].Firstname = c.PostForm("firstname")
-		users[i].Lastname = c.PostForm("lastname")
-		users[i].Username = c.PostForm("username")
-		users[i].Email = c.PostForm("email")
-		users[i].Password, _ = hashPassword(c.PostForm("password"))
-		users[i].Role = c.PostForm("role")
-		c.JSON(200, users[i])
+	if user.Id == id {
+		user.Firstname = c.PostForm("firstname")
+		user.Lastname = c.PostForm("lastname")
+		user.Username = c.PostForm("username")
+		user.Email = c.PostForm("email")
+		user.Password, _ = hashPassword(c.PostForm("password"))
+		user.Role = c.PostForm("role")
+		updateUserOnDB(user)
+		c.JSON(200, user)
 	} else {
 		c.JSON(400, gin.H{"error": "No user found with the id: " + id})
 	}
+}
+
+func Login(c *gin.Context) {
+	fmt.Println("login")
+	// user, password, hasAuth := c.Request.BasicAuth()
+}
+
+// func generateJwtToken(c *gin.Context) {
+// 	fmt.Println("jwtToken")
+// 	user, password, hasAuth := c.Request.BasicAuth()
+// 	jwt.Auth(SECRET)
+// }
+
+func getUsersFromDB() []User {
+	var users []User
+	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role` FROM `users`")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%v\n", user)
+		users = append(users, user)
+	}
+	rows.Close()
+	return users
+}
+
+func getUserFromDBById(id string) User {
+	var users []User
+	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role` FROM `users` WHERE Id=`" + id + "`")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%v\n", user)
+		users = append(users, user)
+	}
+	rows.Close()
+	return users[0]
+}
+
+func saveUserOnDB(user User) {
+	var query string = "INSERT INTO users (`Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`) VALUES ('" + user.Id + "', '" + user.Firstname + "', '" + user.Lastname + "', '" + user.Username + "', '" + user.Email + "', '" + user.Password + "', '" + user.Role + "');"
+	db.RunSqlQueryWithoutReturn(query)
+}
+
+func updateUserOnDB(user User) {
+	var query string = "UPDATE users SET `Firstname`='" + user.Firstname + "', `Lastname`='" + user.Lastname + "', `Username`='" + user.Username + "', `Email`='" + user.Email + "', `Password`='" + user.Password + "', `Role`='" + user.Role + "' WHERE Id='" + user.Id + "';"
+	db.RunSqlQueryWithoutReturn(query)
+}
+
+func deleteUserFromDB(user User) {
+	var query string = "DELETE FROM `users` WHERE Id=" + user.Id + ";"
+	db.RunSqlQueryWithoutReturn(query)
 }
 
 type User struct {

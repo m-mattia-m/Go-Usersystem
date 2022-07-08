@@ -1,14 +1,19 @@
 package main
 
 import (
+	"usersystem/db"
 	"usersystem/users"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
 
+	db.InitDB()
+
 	r := gin.Default()
+	r.POST("/login", users.BasicAuth, users.Login)
 	r.POST("/registration", users.Registration)
 	r.GET("/getUsers", users.BasicAuth, users.GetUsers)
 	r.GET("/deleteUser/:id", users.BasicAuth, users.GetUser)
