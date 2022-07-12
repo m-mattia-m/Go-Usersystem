@@ -14,6 +14,27 @@ import (
 
 // var users []User = getUsersFromDB()
 
+func Main(r *gin.RouterGroup) {
+
+	db.InitDB()
+
+	r.POST("/login", BasicAuth, Login)
+	r.POST("/registration", Registration)
+	r.GET("/getUsers", BasicAuth, GetUsers)
+	r.GET("/deleteUser/:id", BasicAuth, GetUser)
+	r.GET("/deleteUser", BasicAuth, func(c *gin.Context) {
+		c.JSON(400, "Send an ID of a user with. Example: /deleteUser/id")
+	})
+	r.GET("/getUser/:id", BasicAuth, GetUser)
+	r.GET("/getUser", BasicAuth, func(c *gin.Context) {
+		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
+	})
+	r.POST("/editUser/:id", BasicAuth, EditUser)
+	r.POST("/editUser", BasicAuth, func(c *gin.Context) {
+		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
+	})
+}
+
 func BasicAuth(c *gin.Context) {
 	// Get the Basic Authentication credentials
 	var users []User = getUsersFromDB()
