@@ -43,7 +43,7 @@ func BasicAuth(c *gin.Context) {
 	if len(token) > 0 && len(userId) > 0 {
 		i := sort.Search(len(users), func(i int) bool { return userId >= users[i].Id })
 		if i < len(users) && users[i].Id == userId {
-			if checkPasswordHash(token, users[i].Token){
+			if checkPasswordHash(token, users[i].Token) {
 				fmt.Println("Successfully Login with Token")
 			} else {
 				c.Abort()
@@ -300,7 +300,7 @@ func updateUserOnDB(user User) {
 }
 
 func deleteUserFromDB(user User) {
-	var query string = "DELETE FROM `users` WHERE Id=" + user.Id + ";"
+	var query string = "DELETE FROM `users` WHERE Id='" + user.Id + "';"
 	db.RunSqlQueryWithoutReturn(query)
 }
 
