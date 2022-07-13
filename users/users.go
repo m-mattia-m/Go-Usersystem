@@ -1,10 +1,11 @@
 package users
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	"log"
+	"math/big"
 	"sort"
-
 	"usersystem/db"
 
 	"github.com/gin-gonic/gin"
@@ -12,13 +13,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// var users []User = getUsersFromDB()
-
 func Main(r *gin.RouterGroup) {
 
-	db.InitDB()
+	db.CreateUsersTable()
 
-	r.POST("/login", BasicAuth, Login)
+	r.GET("/login", Login)
 	r.POST("/registration", Registration)
 	r.GET("/getUsers", BasicAuth, GetUsers)
 	r.GET("/deleteUser/:id", BasicAuth, GetUser)
@@ -36,19 +35,49 @@ func Main(r *gin.RouterGroup) {
 }
 
 func BasicAuth(c *gin.Context) {
-	// Get the Basic Authentication credentials
 	var users []User = getUsersFromDB()
-	user, password, hasAuth := c.Request.BasicAuth()
-	fmt.Println(user, password, hasAuth)
-	fmt.Println(users)
-	if hasAuth {
-		i := sort.Search(len(users), func(i int) bool { return user <= users[i].Username })
-		if i < len(users) && users[i].Username == user {
-			if checkPasswordHash(password, users[i].Password) {
-				// c.JSON(200, gin.H{"message": "user found"})
-				fmt.Println("successfully")
+	token := c.Request.Header.Get("token")
+	userId := c.Request.Header.Get("userid")
+
+	if len(token) > 0 && len(userId) > 0 {
+		i := sort.Search(len(users), func(i int) bool { return userId <= users[i].Id })
+		if i < len(users) && users[i].Id == userId {
+			if users[i].Token == token {
+				fmt.Println("Successfully Login with Token")
 			} else {
-				// c.JSON(400, gin.H{"error": "password is not correct"})
+				c.Abort()
+				c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+				c.JSON(401, gin.H{"error": "unauthorized"})
+				c.JSON(401, gin.H{"users": users[i], "CurrentToken": token, "userToken": users[i].Token})
+			}
+		} else {
+			c.Abort()
+			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+			c.JSON(400, gin.H{"error": "user not found", "token": token, "userId": userId, "userslength": len(users), "i": i})
+			c.JSON(400, gin.H{"users": users[i]})
+		}
+	} else {
+		c.Abort()
+		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+		c.JSON(400, gin.H{"error": "no credentials provided"})
+	}
+}
+
+func Login(c *gin.Context) {
+	var users []User = getUsersFromDB()
+	username, password, hasAuth := c.Request.BasicAuth()
+	if hasAuth {
+		i := sort.Search(len(users), func(i int) bool { return users[i].Username >= username })
+		if i < len(users) && users[i].Username == username {
+			if checkPasswordHash(password, users[i].Password) {
+				fmt.Println("[Login]: Successfully Login with Username and Password")
+				token, err := GenerateRandomStringURLSafe(128)
+				if err != nil {
+					c.JSON(400, gin.H{"error": "Error generating token"})
+				}
+				updateTokenOnDB(users[i], token)
+				c.JSON(200, gin.H{"token": token, "userId": users[i].Id})
+			} else {
 				c.Abort()
 				c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
 				c.JSON(401, gin.H{"error": "unauthorized"})
@@ -58,6 +87,10 @@ func BasicAuth(c *gin.Context) {
 			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
 			c.JSON(400, gin.H{"error": "user not found"})
 		}
+	} else {
+		c.Abort()
+		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+		c.JSON(400, gin.H{"error": "no credentials provided"})
 	}
 }
 
@@ -70,7 +103,6 @@ func Registration(c *gin.Context) {
 	role := c.PostForm("role")
 	currentUser, msg := newUser(firstname, lastname, username, email, password, role)
 	if msg == "" {
-		// users = append(users, currentUser)
 		saveUserOnDB(currentUser)
 		c.JSON(200, currentUser)
 	} else {
@@ -164,30 +196,45 @@ func EditUser(c *gin.Context) {
 	}
 }
 
-func Login(c *gin.Context) {
-	fmt.Println("login")
-	// user, password, hasAuth := c.Request.BasicAuth()
+func GenerateRandomBytes(n int) ([]byte, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
-// func generateJwtToken(c *gin.Context) {
-// 	fmt.Println("jwtToken")
-// 	user, password, hasAuth := c.Request.BasicAuth()
-// 	jwt.Auth(SECRET)
-// }
+func GenerateRandomString(n int) (string, error) {
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", err
+		}
+		ret[i] = letters[num.Int64()]
+	}
+	return string(ret), nil
+}
+
+func GenerateRandomStringURLSafe(n int) (string, error) {
+	b, err := GenerateRandomBytes(n)
+	return base64.URLEncoding.EncodeToString(b), err
+}
 
 func getUsersFromDB() []User {
 	var users []User
-	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role` FROM `users`")
+	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`, `Token` FROM `users`")
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("[DB]: Can't Select users from DB \t-->\t" + err.Error())
 	}
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role)
+		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role, &user.Token)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Print("[DB]: Can't convert DB-response to User-Object (userId: %v) \t-->\t"+err.Error(), user.Id)
 		}
-		fmt.Printf("%v\n", user)
 		users = append(users, user)
 	}
 	rows.Close()
@@ -196,18 +243,17 @@ func getUsersFromDB() []User {
 
 func getUserFromDBById(id string) User {
 	var users []User
-	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role` FROM `users` WHERE Id=`" + id + "`")
+	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`, `Token` FROM `users` WHERE Id=`" + id + "`")
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("[DB]: Can't Select user by Id from DB \t-->\t" + err.Error())
 	}
 
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role)
+		err := rows.Scan(&user.Id, &user.Firstname, &user.Lastname, &user.Username, &user.Email, &user.Password, &user.Role, &user.Token)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Print("[DB]: Can't convert DB-response to User-Object (userId: %v) \t-->\t"+err.Error(), user.Id)
 		}
-		fmt.Printf("%v\n", user)
 		users = append(users, user)
 	}
 	rows.Close()
@@ -215,7 +261,7 @@ func getUserFromDBById(id string) User {
 }
 
 func saveUserOnDB(user User) {
-	var query string = "INSERT INTO users (`Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`) VALUES ('" + user.Id + "', '" + user.Firstname + "', '" + user.Lastname + "', '" + user.Username + "', '" + user.Email + "', '" + user.Password + "', '" + user.Role + "');"
+	var query string = "INSERT INTO users (`Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`, `Token`) VALUES ('" + user.Id + "', '" + user.Firstname + "', '" + user.Lastname + "', '" + user.Username + "', '" + user.Email + "', '" + user.Password + "', '" + user.Role + "', '');"
 	db.RunSqlQueryWithoutReturn(query)
 }
 
@@ -229,6 +275,11 @@ func deleteUserFromDB(user User) {
 	db.RunSqlQueryWithoutReturn(query)
 }
 
+func updateTokenOnDB(user User, token string) {
+	var query string = "UPDATE `users` SET `Token`= '" + token + "'  WHERE Id='" + user.Id + "';"
+	db.RunSqlQueryWithoutReturn(query)
+}
+
 type User struct {
 	Id        string
 	Firstname string
@@ -237,4 +288,5 @@ type User struct {
 	Email     string
 	Password  string
 	Role      string
+	Token     string
 }
