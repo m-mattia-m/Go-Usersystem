@@ -42,12 +42,8 @@ func BasicAuth(c *gin.Context) {
 
 	if len(token) > 0 && len(userId) > 0 {
 		i := sort.Search(len(users), func(i int) bool { return userId >= users[i].Id })
-		fmt.Println("[BasicAuth]: userId: ", userId)
-		fmt.Println("Compare UserId", users[i].Id)
 		if i < len(users) && users[i].Id == userId {
-			fmt.Println("[BasicAuth]: token: ", token)
-			fmt.Println("Compare token", users[i].Token)
-			if users[i].Token == token {
+			if checkPasswordHash(token, users[i].Token){
 				fmt.Println("Successfully Login with Token")
 			} else {
 				c.Abort()
@@ -73,13 +69,9 @@ func Logout(c *gin.Context) {
 
 	if len(token) > 0 && len(userId) > 0 {
 		i := sort.Search(len(users), func(i int) bool { return userId >= users[i].Id })
-		fmt.Println("[BasicAuth]: userId: ", userId)
-		fmt.Println("Compare UserId", users[i].Id)
 		if i < len(users) && users[i].Id == userId {
-			fmt.Println("[BasicAuth]: token: ", token)
-			fmt.Println("Compare token", users[i].Token)
-			if users[i].Token == token {
-				fmt.Println("[Login]: Successfully Login with Token")
+			if checkPasswordHash(token, users[i].Token) {
+				fmt.Println("[Logout]: Successfully Logout with Token")
 				updateTokenOnDB(users[i], "")
 			} else {
 				c.Abort()
@@ -111,7 +103,8 @@ func Login(c *gin.Context) {
 				if err != nil {
 					c.JSON(400, gin.H{"error": "Error generating token"})
 				}
-				updateTokenOnDB(users[i], token)
+				hashToken, _ := hashPassword(token)
+				updateTokenOnDB(users[i], hashToken)
 				c.JSON(200, gin.H{"token": token, "userId": users[i].Id})
 			} else {
 				c.Abort()
