@@ -18,6 +18,7 @@ func Main(r *gin.RouterGroup) {
 	db.CreateUsersTable()
 
 	r.GET("/login", Login)
+	r.GET("/logout", BasicAuth, Logout)
 	r.POST("/registration", Registration)
 	r.GET("/getUsers", BasicAuth, GetUsers)
 	r.GET("/deleteUser/:id", BasicAuth, GetUser)
@@ -40,15 +41,50 @@ func BasicAuth(c *gin.Context) {
 	userId := c.Request.Header.Get("userid")
 
 	if len(token) > 0 && len(userId) > 0 {
-		i := sort.Search(len(users), func(i int) bool { return userId <= users[i].Id })
+		i := sort.Search(len(users), func(i int) bool { return userId >= users[i].Id })
+		fmt.Println("[BasicAuth]: userId: ", userId)
+		fmt.Println("Compare UserId", users[i].Id)
 		if i < len(users) && users[i].Id == userId {
+			fmt.Println("[BasicAuth]: token: ", token)
+			fmt.Println("Compare token", users[i].Token)
 			if users[i].Token == token {
 				fmt.Println("Successfully Login with Token")
 			} else {
 				c.Abort()
 				c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
-				c.JSON(401, gin.H{"error": "unauthorized"})
-				c.JSON(401, gin.H{"users": users[i], "CurrentToken": token, "userToken": users[i].Token})
+				c.JSON(401, gin.H{"error": "unauthorized token"})
+			}
+		} else {
+			c.Abort()
+			c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+			c.JSON(400, gin.H{"error": "user not found"})
+		}
+	} else {
+		c.Abort()
+		c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+		c.JSON(400, gin.H{"error": "no credentials provided"})
+	}
+}
+
+func Logout(c *gin.Context) {
+	var users []User = getUsersFromDB()
+	token := c.Request.Header.Get("token")
+	userId := c.Request.Header.Get("userid")
+
+	if len(token) > 0 && len(userId) > 0 {
+		i := sort.Search(len(users), func(i int) bool { return userId >= users[i].Id })
+		fmt.Println("[BasicAuth]: userId: ", userId)
+		fmt.Println("Compare UserId", users[i].Id)
+		if i < len(users) && users[i].Id == userId {
+			fmt.Println("[BasicAuth]: token: ", token)
+			fmt.Println("Compare token", users[i].Token)
+			if users[i].Token == token {
+				fmt.Println("[Login]: Successfully Login with Token")
+				updateTokenOnDB(users[i], "")
+			} else {
+				c.Abort()
+				c.Writer.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+				c.JSON(401, gin.H{"error": "unauthorized token"})
 			}
 		} else {
 			c.Abort()
