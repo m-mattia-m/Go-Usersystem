@@ -272,7 +272,7 @@ func getUsersFromDB() []User {
 
 func getUserFromDBById(id string) User {
 	var users []User
-	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`, `Token` FROM `users` WHERE Id=`" + id + "`")
+	rows, err := db.RunSqlQueryWithReturn("SELECT `Id`, `Firstname`, `Lastname`, `Username`, `Email`, `Password`, `Role`, `Token` FROM `users` WHERE Id='" + id + "'")
 	if err != nil {
 		fmt.Println("[DB]: Can't Select user by Id from DB \t-->\t" + err.Error())
 	}
