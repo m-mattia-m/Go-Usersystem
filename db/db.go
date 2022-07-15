@@ -59,6 +59,7 @@ func RunSqlQueryWithReturn(query string) (*sql.Rows, error) {
 	res, err := db.Query(query)
 	if err != nil {
 		fmt.Println("[DB]: Error - Can't run SQL-Query with Return \t-->\t" + err.Error())
+		fmt.Println("[DB]: Query: " + query)
 		return nil, err
 	}
 
@@ -82,6 +83,7 @@ func RunSqlQueryWithSingeReturn(query string) (*sql.Rows, error) {
 	res, err := db.Query(query)
 	if err != nil {
 		fmt.Println("[DB]: Error - Can't run SQL-Query with Single Return \t-->\t" + err.Error())
+		fmt.Println("[DB]: Query: " + query)
 		return nil, err
 	}
 
@@ -104,6 +106,7 @@ func RunSqlQueryWithoutReturn(query string) (bool, error) {
 	res, err := db.Exec(query)
 	if err != nil {
 		fmt.Println("[DB]: Error - Can't run SQL-Query without Return \t-->\t" + err.Error())
+		fmt.Println("[DB]: Query: " + query)
 		return false, err
 	}
 	_ = res
