@@ -33,6 +33,10 @@ func Main(r *gin.RouterGroup) {
 	r.POST("/editUser", BasicAuth, func(c *gin.Context) {
 		c.JSON(400, "Send an ID of a user with. Example: /getUser/id")
 	})
+	r.GET("/checkToken/:id", checkUserToken)
+	r.GET("/checkToken", func(c *gin.Context) {
+		c.JSON(400, "Send the current Token of a user. Example: /checkToken/id")
+	})
 }
 
 func BasicAuth(c *gin.Context) {
@@ -287,6 +291,19 @@ func getUserFromDBById(id string) User {
 	}
 	rows.Close()
 	return users[0]
+}
+
+func checkUserToken(c *gin.Context) {
+	userId := c.Param("id")
+	token := c.Request.Header.Get("token")
+
+	var user User = getUserFromDBById(userId)
+	if checkPasswordHash(token, user.Token) {
+		c.JSON(200, gin.H{"message": "token is valid"})
+		return
+	}
+	c.JSON(400, gin.H{"error": "token is invalid"})
+	return
 }
 
 func saveUserOnDB(user User) {
